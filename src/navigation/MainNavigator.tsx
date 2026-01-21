@@ -24,14 +24,14 @@ export const MainNavigator: React.FC = () => {
   return (
     <NavigationContainer
       theme={{
-        dark: theme.isDark,
+        dark: Boolean(theme.isDark),
         colors: {
-          primary: theme.colors.primary,
-          background: theme.colors.background,
-          card: theme.colors.card,
-          text: theme.colors.text,
-          border: theme.colors.border,
-          notification: theme.colors.red,
+          primary: String(theme.colors.primary),
+          background: String(theme.colors.background),
+          card: String(theme.colors.card),
+          text: String(theme.colors.text),
+          border: String(theme.colors.border),
+          notification: String(theme.colors.red),
         },
       }}
     >
