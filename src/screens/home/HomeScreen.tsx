@@ -10,11 +10,61 @@ import {
   StyleSheet,
   ScrollView,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { useAppTheme } from '@/hooks/useTheme';
+import { ConcertCard, Concert } from '@/components/home/ConcertCard';
+
+// Test concerts with Mux playback IDs
+const TEST_CONCERTS: Concert[] = [
+  {
+    id: '1',
+    title: 'Summer Vibes Festival',
+    artist: 'DJ Vybz',
+    date: '25 janv 2026',
+    time: '21:00',
+    price: 12,
+    genre: 'R&B',
+    isLive: true,
+    viewers: 1247,
+    playbackId: 'c01X6W02WEUNRYGIKNIpouiPPaKHXU01VhgeAjCR2Vrn9w', // Live stream test
+  },
+  {
+    id: '2',
+    title: 'Acoustic Sessions',
+    artist: 'Luna Nova',
+    date: '28 janv 2026',
+    time: '20:00',
+    price: 15,
+    genre: 'Pop',
+    isLive: false,
+    playbackId: 'Ixf100DM00MIBOSiPjVkEfbToOgso01NuVin19ugUXbjQA', // VOD test
+  },
+  {
+    id: '3',
+    title: 'Electro Night Live',
+    artist: 'MC Thunder',
+    date: '30 janv 2026',
+    time: '22:00',
+    price: 18,
+    genre: 'Electronic',
+    isLive: true,
+    viewers: 892,
+    playbackId: 'c01X6W02WEUNRYGIKNIpouiPPaKHXU01VhgeAjCR2Vrn9w',
+  },
+];
 
 export const HomeScreen: React.FC = () => {
   const theme = useAppTheme();
+
+  const handleConcertPress = (concert: Concert) => {
+    // For now, show alert. Will implement navigation later
+    Alert.alert(
+      concert.title,
+      `Artist: ${concert.artist}\nPrice: ${concert.price}€\n\nNavigation to player coming soon!`,
+      [{ text: 'OK' }]
+    );
+  };
 
   const styles = StyleSheet.create({
     container: {
@@ -40,25 +90,24 @@ export const HomeScreen: React.FC = () => {
       marginTop: theme.layout.spacing.sm,
     },
     section: {
-      padding: theme.layout.spacing.xl,
+      paddingTop: theme.layout.spacing.lg,
+    },
+    sectionHeader: {
+      paddingHorizontal: theme.layout.spacing.xl,
+      marginBottom: theme.layout.spacing.base,
     },
     sectionTitle: {
       fontSize: theme.typography.fontSize['2xl'],
       fontWeight: '700',
       color: theme.colors.text,
-      marginBottom: theme.layout.spacing.base,
     },
-    placeholder: {
-      padding: theme.layout.spacing['2xl'],
-      backgroundColor: theme.colors.surface,
-      borderRadius: theme.layout.radius.lg,
-      alignItems: 'center',
-    },
-    placeholderText: {
-      fontSize: theme.typography.fontSize.base,
-      color: theme.colors.textSecondary,
+    concertsScrollContainer: {
+      paddingHorizontal: theme.layout.spacing.xl,
     },
   });
+
+  const liveConcerts = TEST_CONCERTS.filter((c) => c.isLive);
+  const upcomingConcerts = TEST_CONCERTS.filter((c) => !c.isLive);
 
   return (
     <View style={styles.container}>
@@ -70,35 +119,72 @@ export const HomeScreen: React.FC = () => {
         <View style={styles.header}>
           <Text style={styles.logo}>VYBZZZ</Text>
           <Text style={styles.subtitle}>
-            The Future of Live Music Streaming
+            Concerts live en streaming depuis partout
           </Text>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🔴 En Direct Maintenant</Text>
-          <View style={styles.placeholder}>
-            <Text style={styles.placeholderText}>
-              Live concerts will appear here
-            </Text>
+        {/* Live Concerts */}
+        {liveConcerts.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>🔴 En Direct Maintenant</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.concertsScrollContainer}
+            >
+              {liveConcerts.map((concert) => (
+                <ConcertCard
+                  key={concert.id}
+                  concert={concert}
+                  onPress={() => handleConcertPress(concert)}
+                />
+              ))}
+            </ScrollView>
           </View>
-        </View>
+        )}
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>✨ Recommandé Pour Toi</Text>
-          <View style={styles.placeholder}>
-            <Text style={styles.placeholderText}>
-              Recommended concerts based on your taste
-            </Text>
+        {/* Upcoming Concerts */}
+        {upcomingConcerts.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>📅 Concerts à Venir</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.concertsScrollContainer}
+            >
+              {upcomingConcerts.map((concert) => (
+                <ConcertCard
+                  key={concert.id}
+                  concert={concert}
+                  onPress={() => handleConcertPress(concert)}
+                />
+              ))}
+            </ScrollView>
           </View>
-        </View>
+        )}
 
+        {/* All Concerts */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📅 Concerts à Venir</Text>
-          <View style={styles.placeholder}>
-            <Text style={styles.placeholderText}>
-              Upcoming concerts will be listed here
-            </Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>✨ Tous les Concerts</Text>
           </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.concertsScrollContainer}
+          >
+            {TEST_CONCERTS.map((concert) => (
+              <ConcertCard
+                key={concert.id}
+                concert={concert}
+                onPress={() => handleConcertPress(concert)}
+              />
+            ))}
+          </ScrollView>
         </View>
       </ScrollView>
     </View>
