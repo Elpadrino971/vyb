@@ -23,7 +23,7 @@ interface CapsuleNavBarProps {
 
 const NAV_ITEMS = [
   { id: 'home', icon: '🏠', label: 'Home' },
-  { id: 'search', icon: '🔍', label: 'Search' },
+  { id: 'explore', icon: '🎭', label: 'Explorer' },
   { id: 'live', icon: 'LIVE', label: 'Live', isCentral: true },
   { id: 'tickets', icon: '🎫', label: 'Tickets' },
   { id: 'profile', icon: '👤', label: 'Profile' },

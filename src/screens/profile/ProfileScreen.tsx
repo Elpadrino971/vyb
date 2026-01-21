@@ -23,9 +23,8 @@ export const ProfileScreen: React.FC = () => {
       flex: 1,
       backgroundColor: theme.colors.background,
     },
-    content: {
-      flex: 1,
-      paddingBottom: theme.layout.navBar.height + theme.layout.navBar.bottomOffset + 20,
+    scrollContent: {
+      paddingBottom: theme.layout.navBar.height + theme.layout.navBar.bottomOffset + 40,
     },
     header: {
       alignItems: 'center',
@@ -98,7 +97,7 @@ export const ProfileScreen: React.FC = () => {
         barStyle={theme.isDark ? 'light-content' : 'dark-content'}
         backgroundColor={theme.colors.background}
       />
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>👤</Text>

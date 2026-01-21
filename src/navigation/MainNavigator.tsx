@@ -11,7 +11,7 @@ import { CapsuleNavBar } from '@/components/navigation/CapsuleNavBar';
 
 // Screens
 import { HomeScreen } from '@/screens/home/HomeScreen';
-import { SearchScreen } from '@/screens/search/SearchScreen';
+import { ExploreScreen } from '@/screens/explore/ExploreScreen';
 import { LiveScreen } from '@/screens/live/LiveScreen';
 import { TicketsScreen } from '@/screens/tickets/TicketsScreen';
 import { ProfileScreen } from '@/screens/profile/ProfileScreen';
@@ -56,7 +56,7 @@ export const MainNavigator: React.FC = () => {
         }}
       >
         <Tab.Screen name="Home" component={HomeScreen} />
-        <Tab.Screen name="Search" component={SearchScreen} />
+        <Tab.Screen name="Explore" component={ExploreScreen} />
         <Tab.Screen name="Live" component={LiveScreen} />
         <Tab.Screen name="Tickets" component={TicketsScreen} />
         <Tab.Screen name="Profile" component={ProfileScreen} />

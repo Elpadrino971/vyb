@@ -21,9 +21,8 @@ export const HomeScreen: React.FC = () => {
       flex: 1,
       backgroundColor: theme.colors.background,
     },
-    content: {
-      flex: 1,
-      paddingBottom: theme.layout.navBar.height + theme.layout.navBar.bottomOffset + 20,
+    scrollContent: {
+      paddingBottom: theme.layout.navBar.height + theme.layout.navBar.bottomOffset + 40,
     },
     header: {
       padding: theme.layout.spacing.xl,
@@ -67,7 +66,7 @@ export const HomeScreen: React.FC = () => {
         barStyle={theme.isDark ? 'light-content' : 'dark-content'}
         backgroundColor={theme.colors.background}
       />
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.logo}>VYBZZZ</Text>
           <Text style={styles.subtitle}>
