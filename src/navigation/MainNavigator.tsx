@@ -6,7 +6,7 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { useAppTheme } from '@/hooks/useTheme';
+import { useTheme } from '@/hooks/useTheme';
 import { CapsuleNavBar } from '@/components/navigation/CapsuleNavBar';
 
 // Screens
@@ -19,19 +19,19 @@ import { ProfileScreen } from '@/screens/profile/ProfileScreen';
 const Tab = createBottomTabNavigator();
 
 export const MainNavigator: React.FC = () => {
-  const theme = useAppTheme();
+  const { theme, isDark } = useTheme();
 
   return (
     <NavigationContainer
       theme={{
-        dark: Boolean(theme.isDark),
+        dark: isDark,
         colors: {
-          primary: String(theme.colors.primary),
-          background: String(theme.colors.background),
-          card: String(theme.colors.card),
-          text: String(theme.colors.text),
-          border: String(theme.colors.border),
-          notification: String(theme.colors.red),
+          primary: theme.colors.primary,
+          background: theme.colors.background,
+          card: theme.colors.card,
+          text: theme.colors.text,
+          border: theme.colors.border,
+          notification: theme.colors.red,
         },
       }}
     >
