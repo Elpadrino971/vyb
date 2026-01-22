@@ -8,7 +8,7 @@ export default {
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'automatic',
-    newArchEnabled: true,
+    newArchEnabled: false, // Disabled due to strict type validation issues
     scheme: 'vybzzz',
     splash: {
       image: './assets/splash-icon.png',
