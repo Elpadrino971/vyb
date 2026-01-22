@@ -20,7 +20,7 @@ export const STRIPE_CONFIG = {
 // Pricing constants
 export const PRICING = {
   PRO_SUBSCRIPTION_MONTHLY: {
-    priceId: 'price_pro_monthly', // Will be created in Stripe Dashboard
+    priceId: 'price_vybzzz_pro_monthly', // TODO: Replace with real Stripe Price ID after creation
     amount: 5900, // 59.00 EUR in cents
     currency: 'eur',
     interval: 'month',
@@ -34,6 +34,9 @@ export const PRICING = {
     ],
   },
   FOUNDER_BADGE: {
+    priceId: 'price_vybzzz_founder_lifetime', // TODO: Replace with real Stripe Price ID after creation
+    amount: 5900, // 59.00 EUR in cents (one-time payment)
+    currency: 'eur',
     description: 'Badge Founder - Premium à vie',
     features: [
       '🏆 Badge "Founder" exclusif',
