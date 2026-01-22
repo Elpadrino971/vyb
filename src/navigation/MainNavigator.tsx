@@ -21,10 +21,13 @@ const Tab = createBottomTabNavigator();
 export const MainNavigator: React.FC = () => {
   const { theme, isDark } = useTheme();
 
+  // Force boolean type for React Native Fabric
+  const isDarkMode: boolean = isDark === true;
+
   return (
     <NavigationContainer
       theme={{
-        dark: isDark,
+        dark: isDarkMode,
         colors: {
           primary: theme.colors.primary,
           background: theme.colors.background,
