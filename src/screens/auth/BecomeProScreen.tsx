@@ -3,7 +3,7 @@
  * Pro subscription at 59€/month with Founder badge offer
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,51 +14,91 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useStripe } from '@stripe/stripe-react-native';
 import { useAppTheme } from '@/hooks/useTheme';
-import { PRICING, createProSubscription, formatCurrency } from '@/services/stripe';
+import { useAuth } from '@/hooks/useAuth';
+import { PRICING, fetchSubscriptionParams, formatCurrency } from '@/services/stripe';
 
 interface BecomeProScreenProps {
   onSuccess?: () => void;
   onCancel?: () => void;
+  navigation?: any;
 }
 
 export const BecomeProScreen: React.FC<BecomeProScreenProps> = ({
   onSuccess,
   onCancel,
+  navigation,
 }) => {
   const theme = useAppTheme();
+  const { user } = useAuth();
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [foundersRemaining] = useState(12); // Mock data - will come from backend
+  const [foundersRemaining] = useState(12);
 
   const handleSubscribe = async (isFounder: boolean = false) => {
     setIsProcessing(true);
 
     try {
-      // Mock user ID - will come from auth context
-      const userId = 'mock-user-id';
+      const userId = user?.id || '';
 
-      const { clientSecret, subscriptionId } = await createProSubscription(
-        userId,
-        isFounder
-      );
+      if (!userId) {
+        Alert.alert('Erreur', 'Vous devez être connecté pour souscrire.');
+        setIsProcessing(false);
+        return;
+      }
 
-      // Here you would integrate with Stripe's payment sheet
+      // Fetch payment sheet params from backend
+      const { paymentIntent, ephemeralKey, customer } =
+        await fetchSubscriptionParams(userId, isFounder);
+
+      // Initialize PaymentSheet
+      const { error: initError } = await initPaymentSheet({
+        merchantDisplayName: 'Vybzzz',
+        paymentIntentClientSecret: paymentIntent,
+        customerEphemeralKeySecret: ephemeralKey || undefined,
+        customerId: customer || undefined,
+        allowsDelayedPaymentMethods: false,
+        style: 'automatic',
+      });
+
+      if (initError) {
+        Alert.alert('Erreur', initError.message);
+        setIsProcessing(false);
+        return;
+      }
+
+      // Present PaymentSheet
+      const { error: presentError } = await presentPaymentSheet();
+
+      if (presentError) {
+        if (presentError.code !== 'Canceled') {
+          Alert.alert('Erreur de paiement', presentError.message);
+        }
+        setIsProcessing(false);
+        return;
+      }
+
+      // Payment succeeded
       Alert.alert(
-        'Bienvenue chez les Pros ! 🎉',
+        'Bienvenue chez les Pros !',
         isFounder
-          ? `Vous êtes maintenant un artiste Founder!\n\n🏆 Badge exclusif activé\n💎 Premium à vie\n\nCommencez à créer vos concerts dès maintenant.`
-          : `Vous êtes maintenant un artiste Pro!\n\n✅ Abonnement activé\n\nCommencez à créer vos concerts dès maintenant.`,
+          ? 'Vous êtes maintenant un artiste Founder!\n\nBadge exclusif activé. Premium à vie.\n\nCommencez à créer vos concerts dès maintenant.'
+          : 'Vous êtes maintenant un artiste Pro!\n\nAbonnement activé.\n\nCommencez à créer vos concerts dès maintenant.',
         [
           {
             text: 'Créer mon premier concert',
-            onPress: () => onSuccess?.(),
+            onPress: () => {
+              onSuccess?.();
+              navigation?.goBack?.();
+            },
           },
         ]
       );
-    } catch (error) {
+    } catch (error: any) {
       Alert.alert(
         'Erreur',
-        'Une erreur est survenue. Veuillez réessayer.',
+        error.message || 'Une erreur est survenue. Vérifiez que le backend est configuré.',
         [{ text: 'OK' }]
       );
       console.error('Subscription error:', error);

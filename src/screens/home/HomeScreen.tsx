@@ -10,8 +10,8 @@ import {
   StyleSheet,
   ScrollView,
   StatusBar,
-  Alert,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useAppTheme } from '@/hooks/useTheme';
 import { ConcertCard, Concert } from '@/components/home/ConcertCard';
 
@@ -56,14 +56,20 @@ const TEST_CONCERTS: Concert[] = [
 
 export const HomeScreen: React.FC = () => {
   const theme = useAppTheme();
+  const navigation = useNavigation<any>();
 
   const handleConcertPress = (concert: Concert) => {
-    // For now, show alert. Will implement navigation later
-    Alert.alert(
-      concert.title,
-      `Artist: ${concert.artist}\nPrice: ${concert.price}€\n\nNavigation to player coming soon!`,
-      [{ text: 'OK' }]
-    );
+    navigation.navigate('ConcertDetail', {
+      concertId: concert.id,
+      playbackId: concert.playbackId,
+      isLive: concert.isLive,
+      title: concert.title,
+      artist: concert.artist,
+      date: concert.date,
+      price: concert.price,
+      genre: concert.genre,
+      viewers: concert.viewers,
+    });
   };
 
   const styles = StyleSheet.create({

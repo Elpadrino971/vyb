@@ -1,9 +1,9 @@
 /**
  * TicketCheckoutScreen
- * Stripe checkout for concert ticket purchase
+ * Stripe checkout for concert ticket purchase with PaymentSheet
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,8 +14,9 @@ import {
   ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useStripe } from '@stripe/stripe-react-native';
 import { useAppTheme } from '@/hooks/useTheme';
-import { createTicketPaymentIntent, formatCurrency } from '@/services/stripe';
+import { fetchPaymentSheetParams, formatCurrency } from '@/services/stripe';
 
 interface Concert {
   id: string;
@@ -39,35 +40,88 @@ export const TicketCheckoutScreen: React.FC<TicketCheckoutScreenProps> = ({
   onCancel,
 }) => {
   const theme = useAppTheme();
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+
+  // Initialize PaymentSheet on mount
+  useEffect(() => {
+    initializePaymentSheet();
+  }, []);
+
+  const initializePaymentSheet = async () => {
+    try {
+      const { paymentIntent, ephemeralKey, customer } =
+        await fetchPaymentSheetParams(
+          concert.id,
+          concert.price * 100, // Convert to cents
+          'eur'
+        );
+
+      const { error } = await initPaymentSheet({
+        merchantDisplayName: 'Vybzzz',
+        paymentIntentClientSecret: paymentIntent,
+        customerEphemeralKeySecret: ephemeralKey || undefined,
+        customerId: customer || undefined,
+        allowsDelayedPaymentMethods: false,
+        defaultBillingDetails: {
+          name: '',
+        },
+        style: 'automatic',
+      });
+
+      if (!error) {
+        setIsReady(true);
+      } else {
+        console.warn('PaymentSheet init error:', error);
+      }
+    } catch (error) {
+      console.warn('Failed to initialize payment sheet:', error);
+    }
+  };
 
   const handlePurchase = async () => {
     setIsProcessing(true);
 
     try {
-      // Create payment intent
-      const { clientSecret, paymentIntentId } = await createTicketPaymentIntent(
-        concert.id,
-        concert.price * 100, // Convert to cents
-        'eur'
-      );
+      // If PaymentSheet is ready, use it
+      if (isReady) {
+        const { error } = await presentPaymentSheet();
 
-      // Here you would integrate with Stripe's payment sheet
-      // For now, we'll simulate success
-      Alert.alert(
-        'Paiement réussi ! 🎉',
-        `Votre billet pour "${concert.title}" a été acheté.\n\nVous recevrez un email de confirmation avec votre QR code.`,
-        [
-          {
-            text: 'Voir mes billets',
-            onPress: () => onSuccess?.(),
-          },
-        ]
-      );
-    } catch (error) {
+        if (error) {
+          if (error.code === 'Canceled') {
+            // User cancelled - do nothing
+            setIsProcessing(false);
+            return;
+          }
+          Alert.alert('Erreur de paiement', error.message);
+          setIsProcessing(false);
+          return;
+        }
+
+        // Payment succeeded
+        Alert.alert(
+          'Paiement réussi !',
+          `Votre billet pour "${concert.title}" a été acheté.\n\nVous recevrez un email de confirmation avec votre QR code.`,
+          [
+            {
+              text: 'Voir mes billets',
+              onPress: () => onSuccess?.(),
+            },
+          ]
+        );
+      } else {
+        // PaymentSheet not ready - try to re-initialize
+        Alert.alert(
+          'Paiement indisponible',
+          'Le système de paiement n\'est pas prêt. Vérifiez que le backend API est configuré (EXPO_PUBLIC_RORK_API_BASE_URL dans .env) et que les produits Stripe sont créés.',
+          [{ text: 'Réessayer', onPress: initializePaymentSheet }]
+        );
+      }
+    } catch (error: any) {
       Alert.alert(
         'Erreur de paiement',
-        'Une erreur est survenue lors du paiement. Veuillez réessayer.',
+        error.message || 'Une erreur est survenue lors du paiement. Veuillez réessayer.',
         [{ text: 'OK' }]
       );
       console.error('Payment error:', error);
