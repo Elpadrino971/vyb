@@ -1,6 +1,7 @@
 /**
  * SignupScreen
  * User registration with Supabase Auth
+ * Includes input validation and security measures
  */
 
 import React, { useState } from 'react';
@@ -19,6 +20,13 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
+import {
+  validateEmail,
+  validatePassword,
+  validateName,
+  sanitizeName,
+  checkRateLimit,
+} from '@/utils/validation';
 
 interface SignupScreenProps {
   onSwitchToLogin: () => void;
@@ -34,23 +42,47 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({ onSwitchToLogin }) =
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSignup = async () => {
-    if (!fullName.trim() || !email.trim() || !password.trim()) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs.');
+    // Rate limiting check (5 attempts per minute)
+    const rateLimit = checkRateLimit('signup', 5, 60000);
+    if (!rateLimit.allowed) {
+      const seconds = Math.ceil(rateLimit.resetIn / 1000);
+      Alert.alert(
+        'Trop de tentatives',
+        `Veuillez patienter ${seconds} secondes avant de réessayer.`
+      );
       return;
     }
 
-    if (password.length < 6) {
-      Alert.alert('Erreur', 'Le mot de passe doit contenir au moins 6 caractères.');
+    // Validate name
+    const nameValidation = validateName(fullName);
+    if (!nameValidation.valid) {
+      Alert.alert('Erreur', nameValidation.error);
       return;
     }
 
+    // Validate email format
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.valid) {
+      Alert.alert('Erreur', emailValidation.error);
+      return;
+    }
+
+    // Validate password strength (min 8 chars, uppercase, lowercase, number)
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      Alert.alert('Erreur', passwordValidation.error);
+      return;
+    }
+
+    // Check password confirmation
     if (password !== confirmPassword) {
       Alert.alert('Erreur', 'Les mots de passe ne correspondent pas.');
       return;
     }
 
     setIsLoading(true);
-    const { error } = await signUp(email.trim(), password, fullName.trim());
+    const sanitizedName = sanitizeName(fullName);
+    const { error } = await signUp(email.trim().toLowerCase(), password, sanitizedName);
     setIsLoading(false);
 
     if (error) {
@@ -208,7 +240,7 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({ onSwitchToLogin }) =
           <Text style={styles.label}>Mot de passe</Text>
           <TextInput
             style={styles.input}
-            placeholder="Minimum 6 caractères"
+            placeholder="Min. 8 car., majuscule, minuscule, chiffre"
             placeholderTextColor={theme.colors.textSecondary}
             value={password}
             onChangeText={setPassword}

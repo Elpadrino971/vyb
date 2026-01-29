@@ -1,6 +1,7 @@
 /**
  * LoginScreen
  * Email/password login with Supabase Auth
+ * Includes rate limiting and input validation
  */
 
 import React, { useState } from 'react';
@@ -19,6 +20,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
+import { validateEmail, checkRateLimit, resetRateLimit } from '@/utils/validation';
 
 interface LoginScreenProps {
   onSwitchToSignup: () => void;
@@ -32,13 +34,31 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSwitchToSignup }) =>
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs.');
+    // Rate limiting check (5 attempts per minute)
+    const rateLimit = checkRateLimit('login', 5, 60000);
+    if (!rateLimit.allowed) {
+      const seconds = Math.ceil(rateLimit.resetIn / 1000);
+      Alert.alert(
+        'Trop de tentatives',
+        `Veuillez patienter ${seconds} secondes avant de réessayer.`
+      );
+      return;
+    }
+
+    // Validate email format
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.valid) {
+      Alert.alert('Erreur', emailValidation.error);
+      return;
+    }
+
+    if (!password.trim()) {
+      Alert.alert('Erreur', 'Le mot de passe est requis.');
       return;
     }
 
     setIsLoading(true);
-    const { error } = await signIn(email.trim(), password);
+    const { error } = await signIn(email.trim().toLowerCase(), password);
     setIsLoading(false);
 
     if (error) {
@@ -48,6 +68,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSwitchToSignup }) =>
           ? 'Email ou mot de passe incorrect.'
           : error.message
       );
+    } else {
+      // Reset rate limit on successful login
+      resetRateLimit('login');
     }
   };
 
