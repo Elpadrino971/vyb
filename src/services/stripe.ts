@@ -138,18 +138,17 @@ export const PRICING = {
 };
 
 /**
- * Get the API base URL for backend calls
+ * Get the Supabase Functions URL
+ * Uses Supabase Edge Functions instead of external API
  */
-const getApiUrl = (): string => {
-  const url =
-    Constants.expoConfig?.extra?.EXPO_PUBLIC_RORK_API_BASE_URL ||
-    process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
-  if (!url) {
-    throw new Error(
-      'Backend API URL non configurée. Ajoutez EXPO_PUBLIC_RORK_API_BASE_URL dans votre fichier .env'
-    );
+const getSupabaseFunctionsUrl = (): string => {
+  const supabaseUrl =
+    Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL ||
+    process.env.EXPO_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) {
+    throw new Error('Supabase URL non configurée.');
   }
-  return url;
+  return `${supabaseUrl}/functions/v1`;
 };
 
 /**
@@ -167,7 +166,7 @@ const getAuthHeaders = async (): Promise<Record<string, string>> => {
 };
 
 /**
- * Fetch payment sheet parameters from backend
+ * Fetch payment sheet parameters from Supabase Edge Function
  * Returns clientSecret, ephemeralKey, and customerId for PaymentSheet
  */
 export const fetchPaymentSheetParams = async (
@@ -179,10 +178,10 @@ export const fetchPaymentSheetParams = async (
   ephemeralKey: string;
   customer: string;
 }> => {
-  const apiUrl = getApiUrl();
+  const functionsUrl = getSupabaseFunctionsUrl();
   const headers = await getAuthHeaders();
 
-  const response = await fetch(`${apiUrl}/api/payments/create-ticket-payment`, {
+  const response = await fetch(`${functionsUrl}/create-ticket-payment`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ concertId, amount, currency }),
@@ -191,15 +190,15 @@ export const fetchPaymentSheetParams = async (
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(
-      errorData.message || 'Échec de la création du paiement. Vérifiez la configuration backend.'
+      errorData.error || errorData.message || 'Échec de la création du paiement.'
     );
   }
 
   const data = await response.json();
   return {
-    paymentIntent: data.clientSecret || data.paymentIntent,
+    paymentIntent: data.paymentIntent || data.clientSecret,
     ephemeralKey: data.ephemeralKey || '',
-    customer: data.customerId || data.customer || '',
+    customer: data.customer || data.customerId || '',
   };
 };
 
@@ -236,7 +235,7 @@ export const getSubscriptionPlan = (plan: SubscriptionPlan) => {
 };
 
 /**
- * Fetch subscription payment sheet params from backend
+ * Fetch subscription payment sheet params from Supabase Edge Function
  */
 export const fetchSubscriptionParams = async (
   userId: string,
@@ -247,33 +246,27 @@ export const fetchSubscriptionParams = async (
   customer: string;
   subscriptionId: string;
 }> => {
-  const apiUrl = getApiUrl();
+  const functionsUrl = getSupabaseFunctionsUrl();
   const headers = await getAuthHeaders();
-  const planDetails = getSubscriptionPlan(plan);
 
-  const response = await fetch(`${apiUrl}/api/subscriptions/create-pro`, {
+  const response = await fetch(`${functionsUrl}/create-subscription`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({
-      userId,
-      plan,
-      priceId: planDetails.priceId,
-      revenueSplit: planDetails.revenueSplit,
-    }),
+    body: JSON.stringify({ plan }),
   });
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(
-      errorData.message || 'Échec de la création de l\'abonnement. Vérifiez la configuration backend.'
+      errorData.error || errorData.message || 'Échec de la création de l\'abonnement.'
     );
   }
 
   const data = await response.json();
   return {
-    paymentIntent: data.clientSecret || data.paymentIntent,
+    paymentIntent: data.paymentIntent || data.clientSecret,
     ephemeralKey: data.ephemeralKey || '',
-    customer: data.customerId || data.customer || '',
+    customer: data.customer || data.customerId || '',
     subscriptionId: data.subscriptionId || '',
   };
 };
