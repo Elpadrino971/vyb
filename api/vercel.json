@@ -1,0 +1,59 @@
+{
+  "version": 2,
+  "name": "vybzzz-api",
+  "builds": [
+    {
+      "src": "**/*.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/payments/create-ticket-payment",
+      "dest": "/payments/create-ticket-payment.ts"
+    },
+    {
+      "src": "/api/subscriptions/create-pro",
+      "dest": "/subscriptions/create-pro.ts"
+    },
+    {
+      "src": "/api/webhooks/stripe",
+      "dest": "/webhooks/stripe.ts"
+    },
+    {
+      "src": "/api/webhooks/mux",
+      "dest": "/webhooks/mux.ts"
+    },
+    {
+      "src": "/api/concerts/create",
+      "dest": "/concerts/create.ts"
+    },
+    {
+      "src": "/api/concerts/stream-key/(.*)",
+      "dest": "/concerts/stream-key.ts"
+    }
+  ],
+  "env": {
+    "SUPABASE_URL": "@supabase_url",
+    "SUPABASE_SERVICE_ROLE_KEY": "@supabase_service_role_key",
+    "STRIPE_SECRET_KEY": "@stripe_secret_key",
+    "STRIPE_WEBHOOK_SECRET": "@stripe_webhook_secret",
+    "STRIPE_PRICE_PRO_MONTHLY": "@stripe_price_pro_monthly",
+    "STRIPE_PRICE_FOUNDER": "@stripe_price_founder",
+    "MUX_TOKEN_ID": "@mux_token_id",
+    "MUX_TOKEN_SECRET": "@mux_token_secret",
+    "MUX_WEBHOOK_SECRET": "@mux_webhook_secret",
+    "QR_SECRET": "@qr_secret"
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Credentials", "value": "true" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" }
+      ]
+    }
+  ]
+}

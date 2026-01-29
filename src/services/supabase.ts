@@ -34,6 +34,9 @@ export interface Database {
           full_name: string | null;
           avatar_url: string | null;
           role: 'fan' | 'artist' | 'admin';
+          stripe_customer_id: string | null;
+          preferred_language: string;
+          notifications_enabled: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -53,11 +56,14 @@ export interface Database {
           is_verified: boolean;
           is_founder: boolean;
           stripe_account_id: string | null;
+          stripe_subscription_id: string | null;
           revenue_split: number; // 70 for artists
+          total_earnings: number;
+          social_links: Record<string, string>;
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['artists']['Row'], 'id' | 'created_at' | 'updated_at' | 'followers_count'>;
+        Insert: Omit<Database['public']['Tables']['artists']['Row'], 'id' | 'created_at' | 'updated_at' | 'followers_count' | 'total_earnings'>;
         Update: Partial<Database['public']['Tables']['artists']['Insert']>;
       };
       concerts: {
@@ -68,20 +74,28 @@ export interface Database {
           description: string | null;
           genre: string;
           scheduled_at: string;
+          started_at: string | null;
+          ended_at: string | null;
           duration_minutes: number | null;
           price: number;
           currency: string;
           is_live: boolean;
           status: 'scheduled' | 'live' | 'ended' | 'cancelled';
+          mux_live_stream_id: string | null;
           mux_playback_id: string | null;
           mux_stream_key: string | null;
+          mux_vod_asset_id: string | null;
+          mux_vod_playback_id: string | null;
+          vod_available: boolean;
+          vod_expires_at: string | null;
           thumbnail_url: string | null;
           viewers_count: number;
+          peak_viewers: number;
           total_revenue: number;
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['concerts']['Row'], 'id' | 'created_at' | 'updated_at' | 'viewers_count' | 'total_revenue'>;
+        Insert: Omit<Database['public']['Tables']['concerts']['Row'], 'id' | 'created_at' | 'updated_at' | 'viewers_count' | 'total_revenue' | 'peak_viewers'>;
         Update: Partial<Database['public']['Tables']['concerts']['Insert']>;
       };
       tickets: {
