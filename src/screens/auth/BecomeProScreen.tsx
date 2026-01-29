@@ -1,9 +1,9 @@
 /**
  * BecomeProScreen
- * Pro subscription at 59€/month with Founder badge offer
+ * Subscription selection: Smart (39€), Pro (79€), Premium (99€)
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useStripe } from '@stripe/stripe-react-native';
 import { useAppTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
-import { PRICING, fetchSubscriptionParams, formatCurrency } from '@/services/stripe';
+import {
+  PRICING,
+  fetchSubscriptionParams,
+  formatCurrency,
+  SubscriptionPlan,
+} from '@/services/stripe';
 
 interface BecomeProScreenProps {
   onSuccess?: () => void;
@@ -34,10 +39,32 @@ export const BecomeProScreen: React.FC<BecomeProScreenProps> = ({
   const { user } = useAuth();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [foundersRemaining] = useState(12);
+  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
 
-  const handleSubscribe = async (isFounder: boolean = false) => {
+  const plans = [
+    {
+      key: 'smart' as SubscriptionPlan,
+      ...PRICING.SUBSCRIPTIONS.SMART,
+      color: '#4CAF50',
+      popular: false,
+    },
+    {
+      key: 'pro' as SubscriptionPlan,
+      ...PRICING.SUBSCRIPTIONS.PRO,
+      color: '#2196F3',
+      popular: true,
+    },
+    {
+      key: 'premium' as SubscriptionPlan,
+      ...PRICING.SUBSCRIPTIONS.PREMIUM,
+      color: '#D4AF37',
+      popular: false,
+    },
+  ];
+
+  const handleSubscribe = async (plan: SubscriptionPlan) => {
     setIsProcessing(true);
+    setSelectedPlan(plan);
 
     try {
       const userId = user?.id || '';
@@ -45,12 +72,13 @@ export const BecomeProScreen: React.FC<BecomeProScreenProps> = ({
       if (!userId) {
         Alert.alert('Erreur', 'Vous devez être connecté pour souscrire.');
         setIsProcessing(false);
+        setSelectedPlan(null);
         return;
       }
 
-      // Fetch payment sheet params from backend
+      // Fetch payment sheet params from Supabase Edge Function
       const { paymentIntent, ephemeralKey, customer } =
-        await fetchSubscriptionParams(userId, isFounder);
+        await fetchSubscriptionParams(userId, plan);
 
       // Initialize PaymentSheet
       const { error: initError } = await initPaymentSheet({
@@ -65,6 +93,7 @@ export const BecomeProScreen: React.FC<BecomeProScreenProps> = ({
       if (initError) {
         Alert.alert('Erreur', initError.message);
         setIsProcessing(false);
+        setSelectedPlan(null);
         return;
       }
 
@@ -76,15 +105,15 @@ export const BecomeProScreen: React.FC<BecomeProScreenProps> = ({
           Alert.alert('Erreur de paiement', presentError.message);
         }
         setIsProcessing(false);
+        setSelectedPlan(null);
         return;
       }
 
       // Payment succeeded
+      const planDetails = PRICING.SUBSCRIPTIONS[plan.toUpperCase() as keyof typeof PRICING.SUBSCRIPTIONS];
       Alert.alert(
-        'Bienvenue chez les Pros !',
-        isFounder
-          ? 'Vous êtes maintenant un artiste Founder!\n\nBadge exclusif activé. Premium à vie.\n\nCommencez à créer vos concerts dès maintenant.'
-          : 'Vous êtes maintenant un artiste Pro!\n\nAbonnement activé.\n\nCommencez à créer vos concerts dès maintenant.',
+        `Bienvenue chez les ${planDetails.name} !`,
+        `Votre abonnement ${planDetails.name} est activé.\n\nVous bénéficiez du modèle ${planDetails.revenueSplit}/${100 - planDetails.revenueSplit}.\n\nCommencez à créer vos concerts !`,
         [
           {
             text: 'Créer mon premier concert',
@@ -98,12 +127,13 @@ export const BecomeProScreen: React.FC<BecomeProScreenProps> = ({
     } catch (error: any) {
       Alert.alert(
         'Erreur',
-        error.message || 'Une erreur est survenue. Vérifiez que le backend est configuré.',
+        error.message || 'Une erreur est survenue.',
         [{ text: 'OK' }]
       );
       console.error('Subscription error:', error);
     } finally {
       setIsProcessing(false);
+      setSelectedPlan(null);
     }
   };
 
@@ -117,143 +147,79 @@ export const BecomeProScreen: React.FC<BecomeProScreenProps> = ({
     },
     header: {
       padding: theme.layout.spacing.xl,
-      paddingTop: theme.layout.spacing['5xl'],
+      paddingTop: theme.layout.spacing['4xl'],
       alignItems: 'center',
     },
     badge: {
-      fontSize: 60,
+      fontSize: 50,
       marginBottom: theme.layout.spacing.md,
     },
     title: {
-      fontSize: theme.typography.fontSize['4xl'],
+      fontSize: theme.typography.fontSize['3xl'],
       fontWeight: '900',
       color: theme.colors.text,
       textAlign: 'center',
       marginBottom: theme.layout.spacing.sm,
     },
     subtitle: {
-      fontSize: theme.typography.fontSize.lg,
+      fontSize: theme.typography.fontSize.base,
       color: theme.colors.textSecondary,
       textAlign: 'center',
-      marginBottom: theme.layout.spacing.xl,
+      paddingHorizontal: theme.layout.spacing.xl,
     },
 
-    // Founder Banner
-    founderBanner: {
-      margin: theme.layout.spacing.xl,
-      marginTop: 0,
+    plansContainer: {
+      padding: theme.layout.spacing.lg,
+      gap: theme.layout.spacing.lg,
+    },
+
+    planCard: {
       borderRadius: theme.layout.radius.lg,
       overflow: 'hidden',
+      borderWidth: 2,
+      borderColor: theme.colors.border,
+    },
+    planCardPopular: {
+      borderColor: '#2196F3',
       borderWidth: 3,
-      borderColor: theme.colors.gold,
     },
-    founderGradient: {
+    popularBadge: {
+      backgroundColor: '#2196F3',
+      paddingVertical: theme.layout.spacing.xs,
+      alignItems: 'center',
+    },
+    popularBadgeText: {
+      color: theme.colors.white,
+      fontSize: theme.typography.fontSize.sm,
+      fontWeight: '700',
+    },
+    planContent: {
       padding: theme.layout.spacing.lg,
-    },
-    founderHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: theme.layout.spacing.md,
-      gap: theme.layout.spacing.sm,
-    },
-    founderBadgeIcon: {
-      fontSize: 32,
-    },
-    founderTitle: {
-      fontSize: theme.typography.fontSize['2xl'],
-      fontWeight: '900',
-      color: theme.colors.white,
-    },
-    founderDescription: {
-      fontSize: theme.typography.fontSize.base,
-      color: theme.colors.white,
-      opacity: 0.9,
-      marginBottom: theme.layout.spacing.md,
-      lineHeight: theme.typography.lineHeight.relaxed * theme.typography.fontSize.base,
-    },
-    founderLimited: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: 'rgba(255, 255, 255, 0.2)',
-      padding: theme.layout.spacing.sm,
-      borderRadius: theme.layout.radius.base,
-      marginBottom: theme.layout.spacing.md,
-    },
-    founderLimitedText: {
-      color: theme.colors.white,
-      fontWeight: '700',
-      fontSize: theme.typography.fontSize.sm,
-    },
-    founderFeatures: {
-      gap: theme.layout.spacing.sm,
-    },
-    founderFeature: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.layout.spacing.sm,
-    },
-    founderFeatureText: {
-      color: theme.colors.white,
-      fontSize: theme.typography.fontSize.base,
-      fontWeight: '600',
-    },
-    founderPrice: {
-      marginTop: theme.layout.spacing.lg,
-      alignItems: 'center',
-    },
-    founderPriceLabel: {
-      color: theme.colors.white,
-      fontSize: theme.typography.fontSize.sm,
-      opacity: 0.8,
-      marginBottom: 4,
-    },
-    founderPriceValue: {
-      color: theme.colors.white,
-      fontSize: theme.typography.fontSize['4xl'],
-      fontWeight: '900',
-    },
-    founderButton: {
-      marginTop: theme.layout.spacing.lg,
-      backgroundColor: theme.colors.white,
-      borderRadius: theme.layout.radius.base,
-      paddingVertical: theme.layout.spacing.base,
-      alignItems: 'center',
-    },
-    founderButtonText: {
-      color: theme.colors.gold,
-      fontSize: theme.typography.fontSize.lg,
-      fontWeight: '900',
-    },
-
-    // Pro Plan
-    section: {
-      padding: theme.layout.spacing.xl,
-    },
-    sectionTitle: {
-      fontSize: theme.typography.fontSize['2xl'],
-      fontWeight: '700',
-      color: theme.colors.text,
-      marginBottom: theme.layout.spacing.base,
-    },
-    planCard: {
       backgroundColor: theme.colors.surface,
-      borderRadius: theme.layout.radius.lg,
-      padding: theme.layout.spacing.lg,
-      marginBottom: theme.layout.spacing.xl,
     },
     planHeader: {
-      marginBottom: theme.layout.spacing.lg,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: theme.layout.spacing.md,
     },
     planName: {
-      fontSize: theme.typography.fontSize.xl,
-      fontWeight: '700',
+      fontSize: theme.typography.fontSize['2xl'],
+      fontWeight: '900',
       color: theme.colors.text,
-      marginBottom: theme.layout.spacing.xs,
+    },
+    planSplit: {
+      fontSize: theme.typography.fontSize.sm,
+      fontWeight: '700',
+      paddingHorizontal: theme.layout.spacing.sm,
+      paddingVertical: theme.layout.spacing.xs,
+      borderRadius: theme.layout.radius.sm,
+      overflow: 'hidden',
     },
     planDescription: {
-      fontSize: theme.typography.fontSize.base,
+      fontSize: theme.typography.fontSize.sm,
       color: theme.colors.textSecondary,
-      lineHeight: theme.typography.lineHeight.relaxed * theme.typography.fontSize.base,
+      marginBottom: theme.layout.spacing.md,
     },
     planPrice: {
       flexDirection: 'row',
@@ -261,53 +227,71 @@ export const BecomeProScreen: React.FC<BecomeProScreenProps> = ({
       marginBottom: theme.layout.spacing.lg,
     },
     planPriceAmount: {
-      fontSize: theme.typography.fontSize['5xl'],
+      fontSize: theme.typography.fontSize['4xl'],
       fontWeight: '900',
       color: theme.colors.text,
     },
     planPriceInterval: {
-      fontSize: theme.typography.fontSize.lg,
+      fontSize: theme.typography.fontSize.base,
       color: theme.colors.textSecondary,
       marginLeft: theme.layout.spacing.xs,
     },
     features: {
-      gap: theme.layout.spacing.md,
+      gap: theme.layout.spacing.sm,
       marginBottom: theme.layout.spacing.lg,
     },
     feature: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
+      alignItems: 'center',
       gap: theme.layout.spacing.sm,
     },
     featureIcon: {
-      fontSize: 18,
+      fontSize: 16,
     },
     featureText: {
       flex: 1,
-      fontSize: theme.typography.fontSize.base,
+      fontSize: theme.typography.fontSize.sm,
       color: theme.colors.text,
-      lineHeight: theme.typography.lineHeight.normal * theme.typography.fontSize.base,
     },
     subscribeButton: {
       borderRadius: theme.layout.radius.base,
       overflow: 'hidden',
     },
     subscribeGradient: {
-      paddingVertical: theme.layout.spacing.base,
+      paddingVertical: theme.layout.spacing.md,
       alignItems: 'center',
     },
     subscribeButtonText: {
       color: theme.colors.white,
-      fontSize: theme.typography.fontSize.lg,
+      fontSize: theme.typography.fontSize.base,
       fontWeight: '900',
     },
+
     cancelButton: {
       alignItems: 'center',
-      paddingVertical: theme.layout.spacing.base,
+      paddingVertical: theme.layout.spacing.xl,
     },
     cancelButtonText: {
       color: theme.colors.textSecondary,
       fontSize: theme.typography.fontSize.base,
+    },
+
+    compareSection: {
+      padding: theme.layout.spacing.xl,
+      paddingTop: 0,
+    },
+    compareTitle: {
+      fontSize: theme.typography.fontSize.lg,
+      fontWeight: '700',
+      color: theme.colors.text,
+      textAlign: 'center',
+      marginBottom: theme.layout.spacing.md,
+    },
+    compareText: {
+      fontSize: theme.typography.fontSize.sm,
+      color: theme.colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 22,
     },
   });
 
@@ -316,126 +300,108 @@ export const BecomeProScreen: React.FC<BecomeProScreenProps> = ({
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Text style={styles.badge}>🎭</Text>
-          <Text style={styles.title}>Devenez Artiste Pro</Text>
+          <Text style={styles.title}>Devenez Artiste</Text>
           <Text style={styles.subtitle}>
-            Créez des concerts live et gagnez 70% des revenus
+            Choisissez le plan qui correspond à vos ambitions
           </Text>
         </View>
 
-        {/* Founder Offer Banner */}
-        {foundersRemaining > 0 && (
-          <View style={styles.founderBanner}>
-            <LinearGradient
-              colors={['#D4AF37', '#E50914']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.founderGradient}
+        <View style={styles.plansContainer}>
+          {plans.map((plan) => (
+            <View
+              key={plan.key}
+              style={[
+                styles.planCard,
+                plan.popular && styles.planCardPopular,
+              ]}
             >
-              <View style={styles.founderHeader}>
-                <Text style={styles.founderBadgeIcon}>🏆</Text>
-                <Text style={styles.founderTitle}>Offre Founder</Text>
-              </View>
-
-              <Text style={styles.founderDescription}>
-                Rejoignez les artistes pionniers de Vybzzz et bénéficiez du statut premium à vie !
-              </Text>
-
-              <View style={styles.founderLimited}>
-                <Text style={styles.founderLimitedText}>
-                  ⚡ Plus que {foundersRemaining} places disponibles sur 50
-                </Text>
-              </View>
-
-              <View style={styles.founderFeatures}>
-                {PRICING.FOUNDER_BADGE.features.map((feature, index) => (
-                  <View key={index} style={styles.founderFeature}>
-                    <Text style={styles.founderFeatureText}>{feature}</Text>
-                  </View>
-                ))}
-              </View>
-
-              <View style={styles.founderPrice}>
-                <Text style={styles.founderPriceLabel}>Paiement unique</Text>
-                <Text style={styles.founderPriceValue}>
-                  {formatCurrency(PRICING.PRO_SUBSCRIPTION_MONTHLY.amount)}
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.founderButton}
-                onPress={() => handleSubscribe(true)}
-                disabled={isProcessing}
-                activeOpacity={0.8}
-              >
-                {isProcessing ? (
-                  <ActivityIndicator size="small" color={theme.colors.gold} />
-                ) : (
-                  <Text style={styles.founderButtonText}>
-                    Devenir Founder
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </LinearGradient>
-          </View>
-        )}
-
-        {/* Standard Pro Plan */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ou</Text>
-
-          <View style={styles.planCard}>
-            <View style={styles.planHeader}>
-              <Text style={styles.planName}>Abonnement Pro</Text>
-              <Text style={styles.planDescription}>
-                {PRICING.PRO_SUBSCRIPTION_MONTHLY.description}
-              </Text>
-            </View>
-
-            <View style={styles.planPrice}>
-              <Text style={styles.planPriceAmount}>59€</Text>
-              <Text style={styles.planPriceInterval}>/mois</Text>
-            </View>
-
-            <View style={styles.features}>
-              {PRICING.PRO_SUBSCRIPTION_MONTHLY.features.map((feature, index) => (
-                <View key={index} style={styles.feature}>
-                  <Text style={styles.featureIcon}>✓</Text>
-                  <Text style={styles.featureText}>{feature}</Text>
+              {plan.popular && (
+                <View style={styles.popularBadge}>
+                  <Text style={styles.popularBadgeText}>LE PLUS POPULAIRE</Text>
                 </View>
-              ))}
-            </View>
+              )}
 
-            <TouchableOpacity
-              style={styles.subscribeButton}
-              onPress={() => handleSubscribe(false)}
-              disabled={isProcessing}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={theme.colors.gradients.goldToRed}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.subscribeGradient}
-              >
-                {isProcessing ? (
-                  <ActivityIndicator size="small" color={theme.colors.white} />
-                ) : (
-                  <Text style={styles.subscribeButtonText}>
-                    S'abonner maintenant
+              <View style={styles.planContent}>
+                <View style={styles.planHeader}>
+                  <Text style={styles.planName}>{plan.name}</Text>
+                  <Text
+                    style={[
+                      styles.planSplit,
+                      { backgroundColor: plan.color, color: '#FFF' },
+                    ]}
+                  >
+                    {plan.revenueSplit}/{100 - plan.revenueSplit}
                   </Text>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
+                </View>
 
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={onCancel}
-            disabled={isProcessing}
-          >
-            <Text style={styles.cancelButtonText}>Plus tard</Text>
-          </TouchableOpacity>
+                <Text style={styles.planDescription}>{plan.description}</Text>
+
+                <View style={styles.planPrice}>
+                  <Text style={styles.planPriceAmount}>
+                    {formatCurrency(plan.amount)}
+                  </Text>
+                  <Text style={styles.planPriceInterval}>/mois</Text>
+                </View>
+
+                <View style={styles.features}>
+                  {plan.features.map((feature, index) => (
+                    <View key={index} style={styles.feature}>
+                      <Text style={[styles.featureIcon, { color: plan.color }]}>
+                        ✓
+                      </Text>
+                      <Text style={styles.featureText}>{feature}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                <TouchableOpacity
+                  style={styles.subscribeButton}
+                  onPress={() => handleSubscribe(plan.key)}
+                  disabled={isProcessing}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={
+                      plan.key === 'premium'
+                        ? ['#D4AF37', '#E50914']
+                        : plan.key === 'pro'
+                        ? ['#2196F3', '#1976D2']
+                        : ['#4CAF50', '#388E3C']
+                    }
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.subscribeGradient}
+                  >
+                    {isProcessing && selectedPlan === plan.key ? (
+                      <ActivityIndicator size="small" color={theme.colors.white} />
+                    ) : (
+                      <Text style={styles.subscribeButtonText}>
+                        Choisir {plan.name}
+                      </Text>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
         </View>
+
+        <View style={styles.compareSection}>
+          <Text style={styles.compareTitle}>Comment ça marche ?</Text>
+          <Text style={styles.compareText}>
+            Le split indique la répartition des revenus.{'\n'}
+            Smart: vous gardez 50% | Pro: 60% | Premium: 70%{'\n'}
+            Plus votre plan est élevé, plus vous gagnez !
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.cancelButton}
+          onPress={onCancel || (() => navigation?.goBack?.())}
+          disabled={isProcessing}
+        >
+          <Text style={styles.cancelButtonText}>Plus tard</Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
