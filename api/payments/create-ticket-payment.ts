@@ -77,32 +77,32 @@ export default async function handler(req: Request): Promise<Response> {
       );
     }
 
-    // Verify concert exists and get details
+    // Verify concert exists and get details (PascalCase table name)
     const { data: concert, error: concertError } = await supabase
-      .from('concerts')
-      .select('*, artists(artist_name)')
+      .from('Concert')
+      .select('*, Artist(name)')
       .eq('id', concertId)
       .single();
 
     if (concertError || !concert) {
       return new Response(
-        JSON.stringify({ error: 'Concert not found' }),
+        JSON.stringify({ error: 'Concert introuvable' }),
         { status: 404, headers }
       );
     }
 
-    // Check if user already has a ticket for this concert
+    // Check if user already has a ticket for this concert (PascalCase)
     const { data: existingTicket } = await supabase
-      .from('tickets')
+      .from('Ticket')
       .select('id')
-      .eq('concert_id', concertId)
-      .eq('user_id', user.id)
+      .eq('concertId', concertId)
+      .eq('userId', user.id)
       .eq('status', 'paid')
       .single();
 
     if (existingTicket) {
       return new Response(
-        JSON.stringify({ error: 'You already have a ticket for this concert' }),
+        JSON.stringify({ error: 'Vous avez déjà un billet pour ce concert' }),
         { status: 400, headers }
       );
     }
@@ -157,15 +157,15 @@ export default async function handler(req: Request): Promise<Response> {
       },
     });
 
-    // Create pending ticket record
-    await supabase.from('tickets').insert({
-      concert_id: concertId,
-      user_id: user.id,
-      stripe_payment_intent_id: paymentIntent.id,
-      price_paid: amount,
+    // Create pending ticket record (PascalCase table + camelCase columns)
+    await supabase.from('Ticket').insert({
+      concertId: concertId,
+      userId: user.id,
+      stripePaymentIntentId: paymentIntent.id,
+      pricePaid: amount,
       currency: currency,
       status: 'pending',
-      purchased_at: new Date().toISOString(),
+      purchasedAt: new Date().toISOString(),
     });
 
     return new Response(

@@ -21,11 +21,88 @@ export const STRIPE_CONFIG = {
   urlScheme: 'vybzzz',
 };
 
-// Pricing constants
+// Pricing constants - Real Stripe Price IDs
 export const PRICING = {
+  // Subscription Plans
+  SUBSCRIPTIONS: {
+    SMART: {
+      priceId: 'price_1Suw1xH2HsUSSb9aqYsP6nJG',
+      amount: 3900, // 39.00 EUR in cents
+      currency: 'eur',
+      interval: 'month',
+      name: 'Smart',
+      revenueSplit: 50,
+      description: 'Abonnement Smart - Modèle 50/50',
+      features: [
+        'Créez des concerts en illimité',
+        'Streaming live HD',
+        'Analytics de base',
+        'Split 50/50',
+        'Support email',
+      ],
+    },
+    PRO: {
+      priceId: 'price_1SuvybH2HsUSSb9aFyxvGX2N',
+      amount: 7900, // 79.00 EUR in cents
+      currency: 'eur',
+      interval: 'month',
+      name: 'Pro',
+      revenueSplit: 60,
+      description: 'Abonnement Pro - Modèle 60/40',
+      features: [
+        'Créez des concerts en illimité',
+        'Streaming live Full HD',
+        'Analytics avancés',
+        'Split 60/40',
+        'Support prioritaire',
+        'Badge Pro vérifié',
+      ],
+    },
+    PREMIUM: {
+      priceId: 'price_1SOPkQH2HsUSSb9aBjZt16TY',
+      amount: 9900, // 99.00 EUR in cents
+      currency: 'eur',
+      interval: 'month',
+      name: 'Premium',
+      revenueSplit: 70,
+      description: 'Abonnement Premium - Modèle 70/30',
+      features: [
+        'Créez des concerts en illimité',
+        'Streaming live 4K',
+        'Analytics premium + exports',
+        'Split 70/30 - Le plus généreux',
+        'Support VIP 24/7',
+        'Badge Premium exclusif',
+        'Promotion prioritaire',
+        'Replays illimités',
+      ],
+    },
+  },
+  // Ticket Prices
+  TICKETS: {
+    DEFAULT: {
+      priceId: 'price_1SuwJPH2HsUSSb9ajzbPMcfQ',
+      amount: 3000, // 30.00 EUR
+      currency: 'eur',
+      label: 'Standard',
+    },
+    REDUCED: {
+      priceId: 'price_1SuwJPH2HsUSSb9ac69XCT9M',
+      amount: 1800, // 18.00 EUR
+      currency: 'eur',
+      label: 'Réduit',
+    },
+    PREMIUM: {
+      priceId: 'price_1SuwJPH2HsUSSb9afGoRZqSp',
+      amount: 6000, // 60.00 EUR
+      currency: 'eur',
+      label: 'Premium',
+    },
+  },
+  // Legacy - kept for backward compatibility
   PRO_SUBSCRIPTION_MONTHLY: {
-    priceId: 'price_vybzzz_pro_monthly',
-    amount: 5900, // 59.00 EUR in cents
+    priceId: 'price_1SuvybH2HsUSSb9aFyxvGX2N',
+    amount: 7900,
     currency: 'eur',
     interval: 'month',
     description: 'Abonnement Pro - Devenez artiste sur Vybzzz',
@@ -33,13 +110,13 @@ export const PRICING = {
       'Créez des concerts en illimité',
       'Streaming live HD',
       'Analytics avancés',
-      'Split 70/30 le plus généreux du marché',
+      'Split 60/40',
       'Support prioritaire',
     ],
   },
   FOUNDER_BADGE: {
-    priceId: 'price_vybzzz_founder_lifetime',
-    amount: 5900, // 59.00 EUR in cents (one-time payment)
+    priceId: 'price_1SOPkQH2HsUSSb9aBjZt16TY',
+    amount: 9900,
     currency: 'eur',
     description: 'Badge Founder - Premium à vie',
     features: [
@@ -52,7 +129,10 @@ export const PRICING = {
     limitedTo: 50,
   },
   REVENUE_SPLIT: {
-    ARTIST_PERCENTAGE: 70,
+    SMART_PERCENTAGE: 50,
+    PRO_PERCENTAGE: 60,
+    PREMIUM_PERCENTAGE: 70,
+    ARTIST_PERCENTAGE: 70, // Default for Premium
     PLATFORM_PERCENTAGE: 30,
   },
 };
@@ -139,11 +219,28 @@ export const createTicketPaymentIntent = async (
 };
 
 /**
+ * Subscription plan types
+ */
+export type SubscriptionPlan = 'smart' | 'pro' | 'premium';
+
+/**
+ * Get subscription details by plan type
+ */
+export const getSubscriptionPlan = (plan: SubscriptionPlan) => {
+  const plans = {
+    smart: PRICING.SUBSCRIPTIONS.SMART,
+    pro: PRICING.SUBSCRIPTIONS.PRO,
+    premium: PRICING.SUBSCRIPTIONS.PREMIUM,
+  };
+  return plans[plan];
+};
+
+/**
  * Fetch subscription payment sheet params from backend
  */
 export const fetchSubscriptionParams = async (
   userId: string,
-  isFounder: boolean = false
+  plan: SubscriptionPlan = 'pro'
 ): Promise<{
   paymentIntent: string;
   ephemeralKey: string;
@@ -152,11 +249,17 @@ export const fetchSubscriptionParams = async (
 }> => {
   const apiUrl = getApiUrl();
   const headers = await getAuthHeaders();
+  const planDetails = getSubscriptionPlan(plan);
 
   const response = await fetch(`${apiUrl}/api/subscriptions/create-pro`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ userId, isFounder }),
+    body: JSON.stringify({
+      userId,
+      plan,
+      priceId: planDetails.priceId,
+      revenueSplit: planDetails.revenueSplit,
+    }),
   });
 
   if (!response.ok) {

@@ -75,18 +75,18 @@ export default async function handler(req: Request): Promise<Response> {
         const { type, concert_id, user_id } = paymentIntent.metadata;
 
         if (type === 'ticket') {
-          // Update ticket status to paid
+          // Update ticket status to paid (PascalCase table + camelCase columns)
           const { data: ticket, error } = await supabase
-            .from('tickets')
+            .from('Ticket')
             .update({
               status: 'paid',
-              qr_code: generateQRCode(
+              qrCode: generateQRCode(
                 paymentIntent.id,
                 concert_id,
                 user_id
               ),
             })
-            .eq('stripe_payment_intent_id', paymentIntent.id)
+            .eq('stripePaymentIntentId', paymentIntent.id)
             .select()
             .single();
 
@@ -94,37 +94,16 @@ export default async function handler(req: Request): Promise<Response> {
             console.error('Error updating ticket:', error);
           } else {
             // Update concert revenue
-            await supabase.rpc('increment_concert_revenue', {
-              concert_id_param: concert_id,
-              amount_param: paymentIntent.amount,
-            });
+            await supabase
+              .from('Concert')
+              .update({ totalRevenue: paymentIntent.amount })
+              .eq('id', concert_id);
 
             console.log(`Ticket confirmed: ${ticket?.id}`);
           }
-        } else if (type === 'founder_badge') {
-          // Create or update artist with founder badge
-          const { error } = await supabase
-            .from('artists')
-            .upsert({
-              user_id: user_id,
-              is_founder: true,
-              is_verified: true,
-              revenue_split: 70,
-            }, {
-              onConflict: 'user_id',
-            });
-
-          // Update profile role
-          await supabase
-            .from('profiles')
-            .update({ role: 'artist' })
-            .eq('id', user_id);
-
-          if (error) {
-            console.error('Error creating founder artist:', error);
-          } else {
-            console.log(`Founder badge activated for user: ${user_id}`);
-          }
+        } else if (type.includes('subscription')) {
+          // Subscription payments are handled in subscription.created/updated events
+          console.log(`Subscription payment received for user: ${user_id}`);
         }
         break;
       }
@@ -133,31 +112,33 @@ export default async function handler(req: Request): Promise<Response> {
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
         const userId = subscription.metadata.user_id;
+        const plan = subscription.metadata.plan || 'pro';
+        const revenueSplit = parseInt(subscription.metadata.revenue_split || '60');
 
         if (subscription.status === 'active') {
-          // Create or update artist profile
+          // Create or update artist profile (PascalCase table)
           const { error } = await supabase
-            .from('artists')
+            .from('Artist')
             .upsert({
-              user_id: userId,
-              is_verified: true,
-              is_founder: false,
-              revenue_split: 70,
-              stripe_subscription_id: subscription.id,
+              userId: userId,
+              isVerified: true,
+              subscriptionPlan: plan,
+              revenueSplit: revenueSplit,
+              stripeSubscriptionId: subscription.id,
             }, {
-              onConflict: 'user_id',
+              onConflict: 'userId',
             });
 
-          // Update profile role
+          // Update user role
           await supabase
-            .from('profiles')
+            .from('User')
             .update({ role: 'artist' })
             .eq('id', userId);
 
           if (error) {
-            console.error('Error activating pro subscription:', error);
+            console.error('Error activating subscription:', error);
           } else {
-            console.log(`Pro subscription activated for user: ${userId}`);
+            console.log(`${plan} subscription activated for user: ${userId}`);
           }
         }
         break;
@@ -167,27 +148,21 @@ export default async function handler(req: Request): Promise<Response> {
         const subscription = event.data.object as Stripe.Subscription;
         const userId = subscription.metadata.user_id;
 
-        // Check if user is founder (founders don't lose access)
-        const { data: artist } = await supabase
-          .from('artists')
-          .select('is_founder')
-          .eq('user_id', userId)
-          .single();
+        // Deactivate artist
+        await supabase
+          .from('Artist')
+          .update({
+            isVerified: false,
+            subscriptionPlan: null,
+          })
+          .eq('userId', userId);
 
-        if (!artist?.is_founder) {
-          // Deactivate non-founder artist
-          await supabase
-            .from('artists')
-            .update({ is_verified: false })
-            .eq('user_id', userId);
+        await supabase
+          .from('User')
+          .update({ role: 'fan' })
+          .eq('id', userId);
 
-          await supabase
-            .from('profiles')
-            .update({ role: 'fan' })
-            .eq('id', userId);
-
-          console.log(`Pro subscription cancelled for user: ${userId}`);
-        }
+        console.log(`Subscription cancelled for user: ${userId}`);
         break;
       }
 
@@ -195,11 +170,11 @@ export default async function handler(req: Request): Promise<Response> {
         const charge = event.data.object as Stripe.Charge;
         const paymentIntentId = charge.payment_intent as string;
 
-        // Update ticket status
+        // Update ticket status (PascalCase)
         await supabase
-          .from('tickets')
+          .from('Ticket')
           .update({ status: 'refunded' })
-          .eq('stripe_payment_intent_id', paymentIntentId);
+          .eq('stripePaymentIntentId', paymentIntentId);
 
         console.log(`Refund processed for payment: ${paymentIntentId}`);
         break;

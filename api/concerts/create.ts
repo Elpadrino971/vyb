@@ -69,16 +69,16 @@ export default async function handler(req: Request): Promise<Response> {
       );
     }
 
-    // Verify user is a verified artist
+    // Verify user is a verified artist (PascalCase table)
     const { data: artist, error: artistError } = await supabase
-      .from('artists')
-      .select('id, is_verified, artist_name')
-      .eq('user_id', user.id)
+      .from('Artist')
+      .select('id, isVerified, name')
+      .eq('userId', user.id)
       .single();
 
-    if (artistError || !artist?.is_verified) {
+    if (artistError || !artist?.isVerified) {
       return new Response(
-        JSON.stringify({ error: 'You must be a verified artist to create concerts' }),
+        JSON.stringify({ error: 'Vous devez être un artiste vérifié pour créer des concerts' }),
         { status: 403, headers }
       );
     }
@@ -120,24 +120,24 @@ export default async function handler(req: Request): Promise<Response> {
       max_continuous_duration: 14400,
     });
 
-    // Create concert in database
+    // Create concert in database (PascalCase table + camelCase columns)
     const { data: concert, error: concertError } = await supabase
-      .from('concerts')
+      .from('Concert')
       .insert({
-        artist_id: artist.id,
+        artistId: artist.id,
         title,
         description,
         genre,
-        scheduled_at: scheduledAt,
-        duration_minutes: durationMinutes,
+        scheduledAt: scheduledAt,
+        durationMinutes: durationMinutes,
         price,
         currency,
-        thumbnail_url: thumbnailUrl,
-        mux_playback_id: liveStream.playback_ids?.[0]?.id,
-        mux_stream_key: liveStream.stream_key,
-        mux_live_stream_id: liveStream.id,
+        thumbnailUrl: thumbnailUrl,
+        muxPlaybackId: liveStream.playback_ids?.[0]?.id,
+        muxStreamKey: liveStream.stream_key,
+        muxLiveStreamId: liveStream.id,
         status: 'scheduled',
-        is_live: false,
+        isLive: false,
       })
       .select()
       .single();
@@ -155,12 +155,12 @@ export default async function handler(req: Request): Promise<Response> {
           id: concert.id,
           title: concert.title,
           genre: concert.genre,
-          scheduledAt: concert.scheduled_at,
+          scheduledAt: concert.scheduledAt,
           price: concert.price,
-          playbackId: concert.mux_playback_id,
+          playbackId: concert.muxPlaybackId,
           status: concert.status,
         },
-        message: 'Concert created successfully',
+        message: 'Concert créé avec succès',
       }),
       { status: 201, headers }
     );

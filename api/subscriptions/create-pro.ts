@@ -1,9 +1,9 @@
 /**
- * Create Pro Subscription Endpoint
+ * Create Subscription Endpoint
  * POST /api/subscriptions/create-pro
  *
- * Creates a Stripe Subscription for Pro artist account
- * Supports both monthly subscription and one-time Founder badge
+ * Creates a Stripe Subscription for artist accounts
+ * Supports Smart (50/50), Pro (60/40), and Premium (70/30) plans
  */
 
 import Stripe from 'stripe';
@@ -18,17 +18,27 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Price IDs - create these in Stripe Dashboard
+// Real Stripe Price IDs
 const PRICES = {
-  PRO_MONTHLY: process.env.STRIPE_PRICE_PRO_MONTHLY || 'price_vybzzz_pro_monthly',
-  FOUNDER_LIFETIME: process.env.STRIPE_PRICE_FOUNDER || 'price_vybzzz_founder_lifetime',
+  SMART: process.env.STRIPE_PRICE_SMART || 'price_1Suw1xH2HsUSSb9aqYsP6nJG',
+  PRO: process.env.STRIPE_PRICE_PRO || 'price_1SuvybH2HsUSSb9aFyxvGX2N',
+  PREMIUM: process.env.STRIPE_PRICE_PREMIUM || 'price_1SOPkQH2HsUSSb9aBjZt16TY',
 };
 
-const FOUNDER_LIMIT = 50;
+const REVENUE_SPLITS = {
+  smart: 50,
+  pro: 60,
+  premium: 70,
+};
+
+type SubscriptionPlan = 'smart' | 'pro' | 'premium';
 
 interface RequestBody {
   userId: string;
-  isFounder?: boolean;
+  plan?: SubscriptionPlan;
+  priceId?: string;
+  revenueSplit?: number;
+  isFounder?: boolean; // Legacy support
 }
 
 export default async function handler(req: Request): Promise<Response> {
@@ -71,33 +81,34 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     const body: RequestBody = await req.json();
-    const { isFounder = false } = body;
+    const { plan = 'pro', priceId, revenueSplit, isFounder = false } = body;
 
-    // If founder, check if limit reached
-    if (isFounder) {
-      const { count } = await supabase
-        .from('artists')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_founder', true);
+    // Determine price ID and revenue split based on plan
+    let selectedPriceId: string;
+    let selectedRevenueSplit: number;
 
-      if (count !== null && count >= FOUNDER_LIMIT) {
-        return new Response(
-          JSON.stringify({ error: 'Founder badges are sold out (limit: 50)' }),
-          { status: 400, headers }
-        );
-      }
+    if (priceId) {
+      selectedPriceId = priceId;
+      selectedRevenueSplit = revenueSplit || REVENUE_SPLITS[plan];
+    } else if (isFounder) {
+      // Legacy: Founder maps to Premium
+      selectedPriceId = PRICES.PREMIUM;
+      selectedRevenueSplit = 70;
+    } else {
+      selectedPriceId = PRICES[plan.toUpperCase() as keyof typeof PRICES] || PRICES.PRO;
+      selectedRevenueSplit = REVENUE_SPLITS[plan] || 60;
     }
 
-    // Check if user is already a pro artist
+    // Check if user is already an artist (in Artist table - PascalCase)
     const { data: existingArtist } = await supabase
-      .from('artists')
-      .select('id, is_verified')
-      .eq('user_id', user.id)
+      .from('Artist')
+      .select('id, subscriptionPlan')
+      .eq('userId', user.id)
       .single();
 
-    if (existingArtist?.is_verified) {
+    if (existingArtist?.subscriptionPlan) {
       return new Response(
-        JSON.stringify({ error: 'You are already a verified artist' }),
+        JSON.stringify({ error: 'Vous avez déjà un abonnement actif' }),
         { status: 400, headers }
       );
     }
@@ -138,40 +149,27 @@ export default async function handler(req: Request): Promise<Response> {
     let clientSecret: string;
     let subscriptionId: string | null = null;
 
-    if (isFounder) {
-      // One-time payment for Founder badge
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: 5900, // €59.00
-        currency: 'eur',
-        customer: customerId,
-        automatic_payment_methods: { enabled: true },
-        metadata: {
-          user_id: user.id,
-          type: 'founder_badge',
-        },
-      });
-      clientSecret = paymentIntent.client_secret!;
-    } else {
-      // Monthly subscription for Pro
-      const subscription = await stripe.subscriptions.create({
-        customer: customerId,
-        items: [{ price: PRICES.PRO_MONTHLY }],
-        payment_behavior: 'default_incomplete',
-        payment_settings: {
-          save_default_payment_method: 'on_subscription',
-        },
-        expand: ['latest_invoice.payment_intent'],
-        metadata: {
-          user_id: user.id,
-          type: 'pro_subscription',
-        },
-      });
+    // Create subscription with selected plan
+    const subscription = await stripe.subscriptions.create({
+      customer: customerId,
+      items: [{ price: selectedPriceId }],
+      payment_behavior: 'default_incomplete',
+      payment_settings: {
+        save_default_payment_method: 'on_subscription',
+      },
+      expand: ['latest_invoice.payment_intent'],
+      metadata: {
+        user_id: user.id,
+        plan: plan,
+        revenue_split: selectedRevenueSplit.toString(),
+        type: `${plan}_subscription`,
+      },
+    });
 
-      subscriptionId = subscription.id;
-      const invoice = subscription.latest_invoice as Stripe.Invoice;
-      const paymentIntent = invoice.payment_intent as Stripe.PaymentIntent;
-      clientSecret = paymentIntent.client_secret!;
-    }
+    subscriptionId = subscription.id;
+    const invoice = subscription.latest_invoice as Stripe.Invoice;
+    const paymentIntent = invoice.payment_intent as Stripe.PaymentIntent;
+    clientSecret = paymentIntent.client_secret!;
 
     return new Response(
       JSON.stringify({
@@ -181,6 +179,8 @@ export default async function handler(req: Request): Promise<Response> {
         customerId,
         customer: customerId,
         subscriptionId,
+        plan,
+        revenueSplit: selectedRevenueSplit,
       }),
       { status: 200, headers }
     );
